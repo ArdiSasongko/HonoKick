@@ -1,4 +1,5 @@
 import {
+  AppError,
   BadRequest,
   Conflict,
   NotFound,
@@ -22,33 +23,43 @@ export class AuthService {
       throw new BadRequest("email tidak boleh kosong");
     }
 
-    const user = await this.repository.findUserByEmail(email);
-    if (!user) {
-      throw new NotFound("user tidak ditemukan");
-    }
+    try {
+      const user = await this.repository.findUserByEmail(email);
+      if (!user) {
+        throw new NotFound("user tidak ditemukan");
+      }
 
-    return user;
+      return user;
+    } catch (error) {
+      if (error instanceof AppError) {
+        throw error;
+      }
+      this.logger.error(`Error finding user: ${JSON.stringify(error)}`);
+      throw error;
+    }
   }
 
   async insertAuth(data: AuthInput): Promise<number> {
     const { email, password } = data;
 
-    const existingUser = await this.repository.findUserByEmail(email);
-    if (existingUser) {
-      throw new Conflict("Registrasi tidak dapat diproses");
-    }
-
-    const hashPassword = await bcrypt.hash(password, 12);
-
     try {
-      const id = await this.repository.insertAuth(data);
-      return parseInt(id[0]);
-    } catch (error) {
-      if (error instanceof Error) {
-        throw error;
-      } else {
-        throw new Error(`Unexpected error: ${JSON.stringify(error)}`);
+      const existingUser = await this.repository.findUserByEmail(email);
+      if (existingUser) {
+        throw new Conflict("Registrasi tidak dapat diproses");
       }
+
+      const hashedPassword = await bcrypt.hash(password, 12);
+      const authData = { ...data, password: hashedPassword };
+
+      const result = await this.repository.insertAuth(authData);
+      this.logger.debug(`${result[0].id}`);
+      return parseInt(result[0].id);
+    } catch (error) {
+      if (error instanceof AppError) {
+        throw error;
+      }
+      this.logger.error(`Error inserting auth: ${JSON.stringify(error)}`);
+      throw error;
     }
   }
 }

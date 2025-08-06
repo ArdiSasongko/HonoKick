@@ -10,8 +10,11 @@ const EnvSchema = z.object({
   DB_USER: z.string(),
   DB_NAME: z.string(),
   DB_PASSWORD: z.string(),
-
   DB_TIMEOUT: z.coerce.number().default(60000),
+
+  // JWT
+  JWT_SECRET: z.string(),
+  JWT_EXPIRED: z.coerce.number(),
 });
 
 export type env = z.infer<typeof EnvSchema>;
